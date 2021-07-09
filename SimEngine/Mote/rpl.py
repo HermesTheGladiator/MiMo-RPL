@@ -101,8 +101,8 @@ class Rpl(object):
         else:
             if self.settings.rpl_of:
                 # update OF with one specified in config.json
-                of_class  = u'Rpl{0}'.format(self.settings.rpl_of)
-                self.of = getattr(sys.modules[__name__], of_class)(self)
+                of_class  = u'Rpl{0}'.format(self.settings.rpl_of)  ## Objective Function class
+                self.of = getattr(sys.modules[__name__], of_class)(self)    
             if self.dis_mode != u'disabled':
                 # the destination address of the first DIS is determined based
                 # on self.dis_mode
@@ -1199,11 +1199,11 @@ class RplWeightedParameters(RplOF0):
             # update the advertised rank and path ETX
             neighbor[u'rank'] = dio[u'app'][u'rank']
 
-        # update the PDR values
+        # update the PDR , RSSI and mean link latency
         self._update_link_quality_of_neighbors()
 
         # update the residual energy values
-        self._update_residual_energy_neighbors()
+        self._update_residual_energy_of_neighbors()
 
         # select the best neighbor the link to whom is the heighest PDR
         self._update_preferred_parent()
@@ -1221,6 +1221,7 @@ class RplWeightedParameters(RplOF0):
         # check the current PDR and RSSI values of the links to our
         # parents
         self._update_link_quality_of_neighbors()
+        self._update_residual_energy_of_neighbors()
 
         # update the preferred parent if necessary
         previous_parent = self.preferred_parent
@@ -1272,11 +1273,11 @@ class RplWeightedParameters(RplOF0):
         for neighbor in self.neighbors:
             self._update_mean_link_pdr(neighbor)
             self._update_mean_link_rssi(neighbor)
+            self._update_latency(neighbor)          #Added for average latency
 
-    def _update_residual_energy_neighbors(self):
+    def _update_residual_energy_of_neighbors(self):
         for neighbor in self.neighbors:
-            self._update_residual_energy(neighbor)
-        
+            self._update_residual_energy(neighbor)            
 
     def _update_preferred_parent(self):
         if self.parents:
@@ -1353,6 +1354,14 @@ class RplWeightedParameters(RplOF0):
             for channel in self.mote.tsch.hopping_sequence
         ])
 
+    def _update_latency(self,neighbor):
+        curr_neighbor = self.engine.get_mote_by_mac_addr(neighbor[u'mac_addr'])
+        if len(curr_neighbor.latencies) == 0:   #No packets have been sent/received
+            pass 
+        else:
+            neighbor[u'mean_link_latency'] = (sum(curr_neighbor.latencies)/float(len(curr_neighbor.latencies))) * self.settings.tsch_slotDuration
+
+
     def _update_residual_energy(self,neighbor):
         total_charge  = 0.0
         curr_neighbor = self.engine.get_mote_by_mac_addr(neighbor[u'mac_addr'])
@@ -1365,8 +1374,6 @@ class RplWeightedParameters(RplOF0):
 
         neighbor[u'residual_energy'] -= total_charge
         
-
-
     def _find_best_parent(self):
         # find a parent which brings the best rank for us. use mote_id
         # for a tie-breaker.

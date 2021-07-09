@@ -40,6 +40,8 @@ class Mote(object):
 
         # store params
         self.id                        = id
+        self.residual_energy           = d.BATTERY_AA_CAPACITY_mAh
+        self.latencies                 = []                             #Added Latencies --> will update latency in RADIO after every ACK
 
         # admin
         self.dataLock                  = threading.RLock()

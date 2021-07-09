@@ -49,6 +49,7 @@ class Radio(object):
             u'rx_data_tx_ack': 0,
             u'rx_data'       : 0,
             u'sleep'         : 0,
+            u'avg_latency'   : 0        # Added avg latency
         }
         self.log_stats_interval_asn = int(
             float(self.settings.radio_stats_log_period_s) /
@@ -129,6 +130,12 @@ class Radio(object):
             # unicast frame for me, I sent an ACK only when I'm
             # synchronized with the network
             self._update_stats(u'rx_data_tx_ack')
+
+            # Added latency as well
+            #assert packet[u'mac'] is not None
+            #self.latencies.append(self.engine.getAsn()-packet[u'app'][u'appcounter'])
+            #self.stats[u'avg_latency'] = sum(latencies)/float(latencies)
+
         else:
             # either not for me, or broadcast. In any case, I didn't send an ACK
             self._update_stats(u'rx_data')

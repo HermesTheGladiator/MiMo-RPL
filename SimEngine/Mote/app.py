@@ -66,6 +66,10 @@ class AppBase(object):
     def recvPacket(self, packet):
         """Receive a packet destined to this application
         """
+        #adding latency --> update RADIO stats
+        self.mote.latencies += self.engine.getAsn() - packet[u'app'][u'timestamp']
+        self.mote.radio.stats[u'avg_latency'] = sum(self.mote.latencies)/float(self.mote.latencies) * self.settings.tsch_slotDuration   #average latency in seconds
+
         # log and mote stats
         self.log(
             SimEngine.SimLog.LOG_APP_RX,

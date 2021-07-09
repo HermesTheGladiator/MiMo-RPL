@@ -293,7 +293,7 @@ def test_parent_selection(sim_engine):
     )
 
     assert mote_5.rpl.of.preferred_parent['mote_id'] == mote_3.id
-    u.run_until_asn(sim_engine, 100000)
+    u.run_until_asn(sim_engine, 60000)
 
     # The topology of the TSCH network is now:
     #
