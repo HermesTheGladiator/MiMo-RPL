@@ -74,6 +74,11 @@ class Mote(object):
         self.dagRoot         = True
         self.add_ipv6_prefix(d.IPV6_DEFAULT_PREFIX)
 
+    # ===== battery
+
+    def setResidualEnergy(self,re):
+        self.residual_energy         = re
+
     # ==== address
 
     def is_my_ipv6_addr(self, ipv6_addr):

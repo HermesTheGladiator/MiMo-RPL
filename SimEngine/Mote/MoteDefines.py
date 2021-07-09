@@ -29,7 +29,7 @@ PKT_LEN_JOIN_RESPONSE                       = 20
 
 # === rpl
 RPL_MINHOPRANKINCREASE                      = 256
-RPL_PARENT_SWITCH_RANK_THRESHOLD            = 640
+RPL_PARENT_SWITCH_RANK_THRESHOLD            = 200
 
 RPL_INFINITE_RANK                           = 65535
 
@@ -111,6 +111,7 @@ RADIO_STATE_RX                              = u'rx'
 RADIO_STATE_OFF                             = u'off'
 
 # === battery
+BATTERY_AA_CAPACITY_mAh = 2821.5
 # Idle: Time slot during which a node listens for data, but receives
 # none
 CHARGE_IdleListen_uC                        = 6.4

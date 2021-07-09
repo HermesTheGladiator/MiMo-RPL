@@ -6,10 +6,10 @@
     },
     "settings": {
         "combination": {
-            "exec_numMotes":                               [4]
+            "exec_numMotes":                               [5]
         },
         "regular": {
-            "exec_numSlotframesPerRun":                    1000,
+            "exec_numSlotframesPerRun":                    1800,
             "exec_minutesPerRun":                          null,
             "exec_randomSeed":                             "random",
 
@@ -22,7 +22,8 @@
             "app_burstTimestamp":                          null,
             "app_burstNumPackets":                         0,
 
-            "rpl_of":                                      "OF0",
+            "rpl_of":                                      "WeightedParameters",
+            "rpl_of_weights":                              [0.3,0.4],
             "rpl_daoPeriod":                               60,
             "rpl_extensions":                              ["dis_unicast"],
 
@@ -67,3 +68,4 @@
         "python plot.py"
     ]
 }
+
