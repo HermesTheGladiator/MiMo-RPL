@@ -1098,6 +1098,12 @@ class RplOFBestLinkPDR(RplOF0):
 
 
 # =========================== Multi-Objective OF for RPL =========================================
+###   This objective function considers three link metrices and one node metric:
+###   1. Mean Link PDR     :  The average packet delivery ratio over total number of TSCH_slots elapsed.
+###   2. Mean Link RSSI    :  The average Received Signal Strength Indicator (RSSI).
+###   3. Mean Link Latency :  The average latency acquired over all transmissions.
+###   4. Residual Energy   :  The amount of energy left for a node. 
+
 
 class RplWeightedParameters(RplOF0):
     ACCEPTABLE_LOWEST_PDR  = 1.0 / RplOF0.UPPER_LIMIT_OF_ACCEPTABLE_ETX
@@ -1119,7 +1125,8 @@ class RplWeightedParameters(RplOF0):
         self.preferred_parent = self.NONE_PREFERRED_PARENT
         self.neighbors = []
         self.path_pdr = 0
-        
+        self.settings                  = SimEngine.SimSettings.SimSettings()
+        self.weights = self.settings.rpl_of_weights
 
         # short hand
         self.mote = self.rpl.mote
@@ -1236,7 +1243,7 @@ class RplWeightedParameters(RplOF0):
             self.rpl.join_dodag()
 
     @staticmethod
-    def _calculate_rank(neighbor):
+    def _calculate_rank(neighbor,weights):
         # calculate ETX by inverting the path PDR and apply it to the
         # fomula defined by RFC8180 for OF0
         if (
@@ -1246,9 +1253,11 @@ class RplWeightedParameters(RplOF0):
             ):
             rank = d.RPL_INFINITE_RANK
         else:
-            etx = old_div(1, neighbor[u'mean_link_pdr'])
-            step_of_rank = int(3 * etx - 2)
-            rank_increase = step_of_rank * d.RPL_MINHOPRANKINCREASE
+            etx = float(old_div(1, neighbor[u'mean_link_pdr']))     #Converted to float for rank difference
+            step_of_rank = float(3 * etx - 2)
+            rank_increase = (step_of_rank * d.RPL_MINHOPRANKINCREASE) 
+            rank_increase -= weights[0]*neighbor[u'mean_link_latency']*(d.RPL_MINHOPRANKINCREASE/8)      #This is a punishment
+            rank_increase += (-1)*weights[1]*(neighbor[u'residual_energy']/d.BATTERY_AA_CAPACITY_mAh)*(d.RPL_MINHOPRANKINCREASE/16)       
             rank = neighbor[u'rank'] + rank_increase
         return rank
 
@@ -1282,7 +1291,7 @@ class RplWeightedParameters(RplOF0):
     def _update_preferred_parent(self):
         if self.parents:
             new_preferred_parent = self._find_best_parent()
-            new_rank = self._calculate_rank(new_preferred_parent)
+            new_rank = self._calculate_rank(new_preferred_parent,self.weights)
         else:
             new_preferred_parent = self.NONE_PREFERRED_PARENT
             new_rank = d.RPL_INFINITE_RANK
@@ -1305,14 +1314,14 @@ class RplWeightedParameters(RplOF0):
                     or
                     (
                         d.RPL_PARENT_SWITCH_RANK_THRESHOLD <
-                        (self._calculate_rank(self.preferred_parent) - new_rank)
+                        (self._calculate_rank(self.preferred_parent,self.weights) - new_rank)
                     )
                 ):
                 # we're going to swith to the new parent, which may be
                 # NONE_PREFERRED_PARENT
                 old_preferred_parent = self.preferred_parent
                 self.preferred_parent = new_preferred_parent
-                self.rank = self._calculate_rank(new_preferred_parent)
+                self.rank = self._calculate_rank(new_preferred_parent,self.weights)
                 self.rpl.indicate_preferred_parent_change(
                     old_preferred_parent[u'mac_addr'],
                     new_preferred_parent[u'mac_addr']
@@ -1320,7 +1329,7 @@ class RplWeightedParameters(RplOF0):
 
                 if (
                         (
-                            self._calculate_rank(old_preferred_parent) ==
+                            self._calculate_rank(old_preferred_parent,self.weights) ==
                             d.RPL_INFINITE_RANK
                         )
                         and
@@ -1382,8 +1391,8 @@ class RplWeightedParameters(RplOF0):
         self.neighbors = sorted(
             self.neighbors,
             key=lambda e: (
-                self._calculate_rank(e),
-                e[u'mean_link_rssi'],
+                self._calculate_rank(e,self.weights),
+                #e[u'mean_link_rssi'],
                 e[u'mote_id']
             )
         )
