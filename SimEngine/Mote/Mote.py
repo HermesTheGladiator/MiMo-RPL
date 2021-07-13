@@ -40,9 +40,11 @@ class Mote(object):
 
         # store params
         self.id                        = id
-        self.residual_energy           = d.BATTERY_AA_CAPACITY_mAh
+        self.battery_capacity          = float(d.BATTERY_AA_CAPACITY_mAh)
+        self.residual_energy           = float(d.BATTERY_AA_CAPACITY_mAh)
+        self.battery_percentage        = float(self.residual_energy/self.battery_capacity)*100
         self.latencies                 = []                             #Added Latencies --> will update latency in RADIO after every ACK
-
+        self.mean_latency              = 0.0
         # admin
         self.dataLock                  = threading.RLock()
 
@@ -77,7 +79,7 @@ class Mote(object):
     # ===== battery
 
     def setResidualEnergy(self,re):
-        self.residual_energy         = re
+        self.residual_energy         = float(re)
 
     # ==== address
 

@@ -1107,7 +1107,8 @@ class RplOFBestLinkPDR(RplOF0):
 
 class RplWeightedParameters(RplOF0):
     ACCEPTABLE_LOWEST_PDR  = 1.0 / RplOF0.UPPER_LIMIT_OF_ACCEPTABLE_ETX
-    ACCEPTABLE_LOWEST_RESIDUAL_ENERGY = (15/100)*d.BATTERY_AA_CAPACITY_mAh  # Threshold for acceptable parents; change "15" to desirable value
+    ACCEPTABLE_LOWEST_BATTERY_PERCENTAGE = 12   # Threshold for acceptable parents; change "12" to desirable value
+    ACCEPTABLE_LOWEST_RESIDUAL_ENERGY = 0.12*d.BATTERY_AA_CAPACITY_mAh  
     INVALID_RSSI_VALUE = -1000
 
     NONE_PREFERRED_PARENT = {
@@ -1116,8 +1117,9 @@ class RplWeightedParameters(RplOF0):
         u'rank': d.RPL_INFINITE_RANK,
         u'mean_link_pdr': 0,
         u'mean_link_rssi': INVALID_RSSI_VALUE,
-        u'mean_link_latency': 0,         #added this
-        u'residual_energy': 0            #added this
+        u'mean_link_latency': 0,          #added this
+        u'residual_energy': 0,            #added this
+        u'battery_percentage':100         #added this
     }
 
     def __init__(self, rpl):
@@ -1199,7 +1201,8 @@ class RplWeightedParameters(RplOF0):
                     u'rank': None,
                     u'mean_link_pdr': 0,
                     u'mean_link_latency': 0,                                     #Added Latency metric
-                    u'residual_energy': d.BATTERY_AA_CAPACITY_mAh                #Added Energy metric
+                    u'residual_energy': d.BATTERY_AA_CAPACITY_mAh,               #Added Energy metric
+                    u'battery_percentage':100, 
                 }
                 self.neighbors.append(neighbor)
 
@@ -1253,11 +1256,12 @@ class RplWeightedParameters(RplOF0):
             ):
             rank = d.RPL_INFINITE_RANK
         else:
-            etx = float(old_div(1, neighbor[u'mean_link_pdr']))     #Converted to float for rank difference
+            etx = float(old_div(1,neighbor[u'mean_link_pdr']))     #Converted to float for rank difference
             step_of_rank = float(3 * etx - 2)
             rank_increase = (step_of_rank * d.RPL_MINHOPRANKINCREASE) 
-            rank_increase -= weights[0]*neighbor[u'mean_link_latency']*(d.RPL_MINHOPRANKINCREASE/8)      #This is a punishment
-            rank_increase += (-1)*weights[1]*(neighbor[u'residual_energy']/d.BATTERY_AA_CAPACITY_mAh)*(d.RPL_MINHOPRANKINCREASE/16)       
+            rank_increase += weights[1]*neighbor[u'mean_link_latency']*(d.RPL_MINHOPRANKINCREASE/4)      #This is a punishment
+            rank_increase += weights[2]*(100-neighbor[u'battery_percentage'])*(d.RPL_MINHOPRANKINCREASE/16) 
+               
             rank = neighbor[u'rank'] + rank_increase
         return rank
 
@@ -1286,7 +1290,8 @@ class RplWeightedParameters(RplOF0):
 
     def _update_residual_energy_of_neighbors(self):
         for neighbor in self.neighbors:
-            self._update_residual_energy(neighbor)            
+            self._update_residual_energy(neighbor)
+            self._update_battery_percentage(neighbor)            
 
     def _update_preferred_parent(self):
         if self.parents:
@@ -1369,11 +1374,14 @@ class RplWeightedParameters(RplOF0):
             pass 
         else:
             neighbor[u'mean_link_latency'] = (sum(curr_neighbor.latencies)/float(len(curr_neighbor.latencies))) * self.settings.tsch_slotDuration
-
+            curr_neighbor.mean_latency = neighbor[u'mean_link_latency']
 
     def _update_residual_energy(self,neighbor):
         total_charge  = 0.0
         curr_neighbor = self.engine.get_mote_by_mac_addr(neighbor[u'mac_addr'])
+        
+        neighbor[u'residual_energy'] = curr_neighbor.residual_energy
+
         total_charge += (curr_neighbor.radio.stats[u'idle_listen']- curr_neighbor.radio.stats[u'last_updated']) * d.CHARGE_IdleListen_uC       ## consumption for Idle listening
         total_charge += (curr_neighbor.radio.stats[u'tx_data_rx_ack']- curr_neighbor.radio.stats[u'last_updated']) * d.CHARGE_TxDataRxAck_uC   ## consumption for Tx-ACK sequence
         total_charge += (curr_neighbor.radio.stats[u'tx_data']- curr_neighbor.radio.stats[u'last_updated']) * d.CHARGE_TxData_uC               ## consumption for Tx only (BDCAST)
@@ -1382,6 +1390,11 @@ class RplWeightedParameters(RplOF0):
         total_charge += (curr_neighbor.radio.stats[u'sleep']- curr_neighbor.radio.stats[u'last_updated']) * d.CHARGE_Sleep_uC                  ## consumption for Sleep
 
         neighbor[u'residual_energy'] -= total_charge
+
+    def _update_battery_percentage(self,neighbor):
+        curr_neighbor = self.engine.get_mote_by_mac_addr(neighbor[u'mac_addr'])
+        neighbor[u'battery_percentage'] = float(curr_neighbor.residual_energy/curr_neighbor.battery_capacity)*100
+        curr_neighbor.battery_percentage = neighbor[u'battery_percentage']
         
     def _find_best_parent(self):
         # find a parent which brings the best rank for us. use mote_id
@@ -1392,7 +1405,8 @@ class RplWeightedParameters(RplOF0):
             self.neighbors,
             key=lambda e: (
                 self._calculate_rank(e,self.weights),
-                #e[u'mean_link_rssi'],
+                e[u'residual_energy'],
+                e[u'mean_link_pdr'],
                 e[u'mote_id']
             )
         )

@@ -87,21 +87,16 @@ def tsch_all_nodes_check_dedicated_cell(motes):
 
         assert len(tx_cells) > 0
 
-
-def test_free_run(sim_engine):
-    sim_engine = sim_engine(
-        diff_config = {'rpl_of': 'OFBestLinkPDR'} #diff_config = {'rpl_of': 'OF0'}
-    )
-    u.run_until_end(sim_engine)
-
-
 def test_parent_selection(sim_engine):
     sim_engine = sim_engine(
         diff_config = {
             'exec_numMotes'  : 6,
             'conn_class'     : 'FullyMeshed',
             'phy_numChans'   : 1,
-            'rpl_of'         : 'OFBestLinkPDR',
+            'rpl_of'         : 'WeightedParameters',
+            'rpl_of_weights' :  [0.1,0.8,0.6],
+            'exec_numSlotframesPerRun': 1500,
+            'sf_class'       : 'MSF',
             'secjoin_enabled': False
         }
     )
@@ -131,7 +126,7 @@ def test_parent_selection(sim_engine):
     #     |                 /
     #   (1.0)              /
     #     |               /
-    # [mote_3]         (0.45)
+    # [LPN_3]         (0.45)
     #      \            /
     #     (1.0)        /
     #        \        /
@@ -194,6 +189,12 @@ def test_parent_selection(sim_engine):
         RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*1.5
     )
 
+
+    # mote_2 and mote_3 transitions to LPN state
+    mote_3.setResidualEnergy(0.15*d.BATTERY_AA_CAPACITY_mAh)    #Battery set to 15%.
+    mote_2.setResidualEnergy(0.4*d.BATTERY_AA_CAPACITY_mAh)
+
+
 # =========================== Network Joining =========================================
 
     # get all the motes synchronized
@@ -245,181 +246,21 @@ def test_parent_selection(sim_engine):
     # its parent as mote_3
     dio = u.create_dio(mote_3)
     mote_5.sixlowpan.recvPacket(dio)
-    assert mote_5.rpl.of.preferred_parent['mote_id'] == mote_3.id
 
+    assert mote_5.rpl.of.preferred_parent['mote_id'] == mote_3.id
+    #assert mote_5.rpl.of._find_best_parent() == mote_3.id
     # step 5: give a DIO of mote_4 to mote_5; mote_5 should stay
     # with parent as mote_3
     dio = u.create_dio(mote_4)
     mote_5.sixlowpan.recvPacket(dio)
-    assert mote_5.rpl.of.preferred_parent['mote_id'] == mote_3.id
 
-
-    #----- Network Formation -----#
-
-     # verify no packets yet received by root
-    assert len(u.read_log_file([SimLog.LOG_APP_RX['type']])) == 0
-
-    # give the network time to form
-    u.run_until_asn(sim_engine,30000)
-
-    # verify no packet was dropped
-    #check_no_packet_drop()
-
-    # verify that all nodes are sync'ed
-    tsch_check_all_nodes_synced(sim_engine.motes)
-
-    # verify that all nodes are join'ed
-    secjoin_check_all_nodes_joined(sim_engine.motes)
-
-    #(Optional)
-    # verify that all nodes have acquired rank and preferred parent
-    #rpl_check_all_node_prefered_parent(sim_engine.motes)
-    #rpl_check_all_node_rank(sim_engine.motes)
-
-    # verify that all nodes are sending EBs, DIOs and DAOs
-    #tsch_check_all_nodes_send_EBs(sim_engine.motes)
-    #rpl_check_all_nodes_send_DIOs(sim_engine.motes)
-    #rpl_check_all_motes_send_DAOs(sim_engine.motes)
-
-
-# =========================== UL/DL Traffic =========================================
-
-    # pick a "datamote" which will send/receive data
-    datamote = sim_engine.motes[5] # pick furthest mote
-
-    # get the DAG root
-    assert sim_engine.DAGROOT_ID == mote_0.id
-    dagroot  = sim_engine.motes[sim_engine.DAGROOT_ID]
-
-   
-
-    #u.run_until_asn(sim_engine,sim_engine.getAsn() + 10000)
-
-    #UL
-    for _ in range(100):
-
-            # inject data at the datamote
-            datamote.app._send_a_single_packet()
-
-            # give the data time to reach the root
-            #u.run_until_asn(sim_engine, sim_engine.getAsn() + 10000)
-
-    #DL
-    for _ in range(100):
-
-            # inject data at the root
-            dagroot.app._send_ack(datamote.id)
-
-            # give the data time to reach the datamote
-            #u.run_until_asn(sim_engine, sim_engine.getAsn() + 10000)
-
-# =========================== Connectivity Matrix Update =========================================
-# The Updated Links metrices are given below, () denotes link PDR:
-    #
-    #         [mote_0]
-    #        /        \
-    #     (0.3)        \
-    #      /            \
-    # [mote_1]         (0.75)
-    #     |               \
-    #   (0.3)              \
-    #     |                 \
-    # [mote_2]           [mote_4]   
-    #     |                 /
-    #   (0.3)              /
-    #     |               /
-    # [mote_3]         (0.75)
-    #      \            /
-    #     (0.3)        /
-    #        \        /
-    #         [mote_5]
-
-# degrade link PDRs below ACCEPTABLE_LOWEST_PDR
-    # - between mote 0 and mote 1
-    # - between mote 1 and mote 2
-    # - between mote 2 and mote 3
-    # - between mote 3 and mote 5
-
-    connectivity_matrix.set_pdr_both_directions(
-        mote_0.id,
-        mote_1.id,
-        channel,
-        RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*0.8
-    )
-
-    connectivity_matrix.set_pdr_both_directions(
-        mote_1.id,
-        mote_2.id,
-        channel,
-        RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*0.8
-    )
-
-    connectivity_matrix.set_pdr_both_directions(
-        mote_2.id,
-        mote_3.id,
-        channel,
-        RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*0.8
-    )
-
-    connectivity_matrix.set_pdr_both_directions(
-        mote_3.id,
-        mote_5.id,
-        channel,
-        RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*0.8
-    )
-
-
-    # Upgrade link PDRs to 2.5*ACCEPTABLE_LOWEST_PDR
-    # - between mote 0 and mote 4
-    # - between mote 4 and mote 5
-    connectivity_matrix.set_pdr_both_directions(
-        mote_0.id,
-        mote_4.id,
-        channel,
-        RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*2.5
-    )
-    connectivity_matrix.set_pdr_both_directions(
-        mote_4.id,
-        mote_5.id,
-        channel,
-        RplOFBestLinkPDR.ACCEPTABLE_LOWEST_PDR*2.5
-    )
-
-    assert mote_5.rpl.of.preferred_parent['mote_id'] == mote_3.id
-    u.run_until_asn(sim_engine, 80000)
+    #assert mote_4.rpl.get_rank() == 0
+    #assert mote_5.rpl.of._find_best_parent() != mote_5.rpl.of.preferred_parent
+    #assert mote_5.rpl.of._find_best_parent() == mote_3.id
+    
+    #assert d.RPL_PARENT_SWITCH_RANK_THRESHOLD < (mote_5.rpl.of._calculate_rank(mote_5.rpl.of.preferred_parent,mote_5.rpl.of.weights) - mote_5.rpl.of._calculate_rank(mote_5.rpl.of._find_best_parent(),mote_5.rpl.of.weights))
 
     assert mote_5.rpl.of.preferred_parent['mote_id'] == mote_4.id
 
-
-# =========================== UL/DL After =========================================
-
-    # pick a "datamote" which will send/receive data
-    datamote = sim_engine.motes[5] # pick furthest mote
-
-    # get the DAG root
-    assert sim_engine.DAGROOT_ID == mote_0.id
-    dagroot  = sim_engine.motes[sim_engine.DAGROOT_ID]
-
-   
-
-    #u.run_until_asn(sim_engine,sim_engine.getAsn() + 10000)
-
-    #UL
-    for _ in range(100):
-
-            # inject data at the datamote
-            datamote.app._send_a_single_packet()
-
-            # give the data time to reach the root
-            #u.run_until_asn(sim_engine, sim_engine.getAsn() + 10000)
-
-    #DL
-    for _ in range(100):
-
-            # inject data at the root
-            dagroot.app._send_ack(datamote.id)
-
-            # give the data time to reach the datamote
-            #u.run_until_asn(sim_engine, sim_engine.getAsn() + 10000)
 
     u.run_until_end(sim_engine)
