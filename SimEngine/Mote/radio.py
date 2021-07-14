@@ -131,11 +131,6 @@ class Radio(object):
             # synchronized with the network
             self._update_stats(u'rx_data_tx_ack')
 
-            # Added latency as well
-            #assert packet[u'mac'] is not None
-            #self.latencies.append(self.engine.getAsn()-packet[u'app'][u'appcounter'])
-            #self.stats[u'avg_latency'] = sum(latencies)/float(latencies)
-
         else:
             # either not for me, or broadcast. In any case, I didn't send an ACK
             self._update_stats(u'rx_data')

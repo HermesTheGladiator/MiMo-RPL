@@ -59,10 +59,12 @@ class Sixlowpan(object):
         assert u'srcIp' in packet[u'net']
         assert u'dstIp' in packet[u'net']
 
+
         goOn = True
 
         # put hop_limit field to the net header
         packet[u'net'][u'hop_limit'] = d.IPV6_DEFAULT_HOP_LIMIT
+
 
         # mark a downward packet like 'O' option in RPL Option defined by RFC
         # 6553
@@ -120,7 +122,7 @@ class Sixlowpan(object):
         if goOn:
             packet[u'mac'] = {
                 u'srcMac': self.mote.get_mac_addr(),
-                u'dstMac': dstMac
+                u'dstMac': dstMac,
             }
 
         # cut packet into fragments
@@ -143,7 +145,7 @@ class Sixlowpan(object):
             d.PKT_TYPE_JOIN_REQUEST,
             d.PKT_TYPE_JOIN_RESPONSE,
         ]
-
+        
         goOn = True
 
         # log
@@ -154,6 +156,7 @@ class Sixlowpan(object):
                 u'packet':          packet,
             }
         )
+
 
         # add the source mode to the neighbor_cache if it's on-link
         # FIXME: IPv6 prefix should be examined
@@ -166,12 +169,13 @@ class Sixlowpan(object):
                 packet = self.fragmentation.fragRecv(packet)
                 if not packet:
                     goOn = False
-
+                
             # source routing header
             elif 'sourceRoute' in packet[u'net']:
                 packet[u'net'][u'dstIp'] = packet[u'net'][u'sourceRoute'].pop(0)
                 if len(packet[u'net'][u'sourceRoute']) == 0:
                     del packet[u'net'][u'sourceRoute']
+                    
 
         # handle packet
         if goOn:

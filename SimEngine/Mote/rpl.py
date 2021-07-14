@@ -1142,10 +1142,15 @@ class RplWeightedParameters(RplOF0):
         ret_val = []
         for neighbor in self.neighbors:
 
-            # parent should have residual energy more than ACCEPTABLE_LOWEST_RESIDUAL_ENERGY
+             # parent should have more than ACCEPTABLE_LOWEST_BATTERY_PERCENTAGE battery left
+            if neighbor[u'battery_percentage'] < self.ACCEPTABLE_LOWEST_BATTERY_PERCENTAGE:
+                # this neighbor is not eligible to be a parent
+                continue
+            '''
             if neighbor[u'residual_energy'] < self.ACCEPTABLE_LOWEST_RESIDUAL_ENERGY:
                 # this neighbor is not eligible to be a parent
                 continue
+            '''
 
             # parent should have better PDR than ACCEPTABLE_LOWEST_PDR
             if neighbor[u'mean_link_pdr'] < self.ACCEPTABLE_LOWEST_PDR:
@@ -1259,7 +1264,7 @@ class RplWeightedParameters(RplOF0):
             etx = float(old_div(1,neighbor[u'mean_link_pdr']))     #Converted to float for rank difference
             step_of_rank = float(3 * etx - 2)
             rank_increase = (step_of_rank * d.RPL_MINHOPRANKINCREASE) 
-            rank_increase += weights[1]*neighbor[u'mean_link_latency']*(d.RPL_MINHOPRANKINCREASE/4)      #This is a punishment
+            rank_increase += weights[1]*neighbor[u'mean_link_latency']*(d.RPL_MINHOPRANKINCREASE/4)* 100      #This is a punishment
             rank_increase += weights[2]*(100-neighbor[u'battery_percentage'])*(d.RPL_MINHOPRANKINCREASE/16) 
                
             rank = neighbor[u'rank'] + rank_increase
@@ -1373,7 +1378,7 @@ class RplWeightedParameters(RplOF0):
         if len(curr_neighbor.latencies) == 0:   #No packets have been sent/received
             pass 
         else:
-            neighbor[u'mean_link_latency'] = (sum(curr_neighbor.latencies)/float(len(curr_neighbor.latencies))) * self.settings.tsch_slotDuration
+            neighbor[u'mean_link_latency'] = (sum(curr_neighbor.latencies)/len(curr_neighbor.latencies))
             curr_neighbor.mean_latency = neighbor[u'mean_link_latency']
 
     def _update_residual_energy(self,neighbor):

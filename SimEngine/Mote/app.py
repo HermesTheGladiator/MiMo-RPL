@@ -66,9 +66,10 @@ class AppBase(object):
     def recvPacket(self, packet):
         """Receive a packet destined to this application
         """
-        #adding latency --> update RADIO stats
-        self.mote.latencies += self.engine.getAsn() - packet[u'app'][u'timestamp']
-        self.mote.radio.stats[u'avg_latency'] = sum(self.mote.latencies)/float(self.mote.latencies) * self.settings.tsch_slotDuration   #average latency in seconds
+        #Adding callback for Latency calculation
+        latency = (self.engine.getAsn() - packet[u'app'][u'timestamp'])* self.settings.tsch_slotDuration
+        self.mote.latencies.append(latency)
+        self.mote.radio.stats[u'avg_latency'] = sum(self.mote.latencies)/len(self.mote.latencies)   #average latency in seconds
 
         # log and mote stats
         self.log(
@@ -94,7 +95,7 @@ class AppBase(object):
             u'net': {
                 u'srcIp':         self.mote.get_ipv6_global_addr(),
                 u'dstIp':         dstIp,
-                u'packet_length': packet_length
+                u'packet_length': packet_length,
             },
             u'app': {
                 u'appcounter':    self.appcounter,
@@ -151,7 +152,6 @@ class AppRoot(AppBase):
 
     def recvPacket(self, packet):
         assert self.mote.dagRoot
-
         # log and update mote stats
         self.log(
             SimEngine.SimLog.LOG_APP_RX,
@@ -160,6 +160,7 @@ class AppRoot(AppBase):
                 u'packet'  : packet
             }
         )
+        self._send_ack(packet[u'net']['srcIp'])
 
     #======================== private ==========================================
 
@@ -231,6 +232,7 @@ class AppPeriodic(AppBase):
             dstIp          = self.mote.rpl.dodagId,
             packet_length  = self.settings.app_pkLength
         )
+
         # schedule the next transmission
         self._schedule_transmission()
 
